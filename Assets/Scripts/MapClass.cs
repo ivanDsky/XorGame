@@ -14,6 +14,7 @@ public class MapClass
 
     public MapClass(Vector2Int size)
     {
+        
         this.size = size;
         cellMap = new Dictionary<Vector2Int, FieldCell>();
     }
