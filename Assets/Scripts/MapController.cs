@@ -7,7 +7,9 @@ public class MapController : MonoBehaviour
 {
     public PlayerActionScriptableObject _4sides;
     public PlayerActionScriptableObject _8sides;
-    public TileBase defaulTile;
+    public Tilemap chooseTilemap;
+    public TileBase defaultTile;
+    public TileBase chooseTile;
     public MapClass map;
     public Vector2Int mapSize;
     public Player[] players;
@@ -15,6 +17,7 @@ public class MapController : MonoBehaviour
     public Color turnColor = new Color(0.47f,1,1);
     public Color turnColorNoCopy = new Color(0.19f,0.5f,1);
     public Color attackColorNoCopy = new Color(1f, 0.15f, 0.09f);
+    public Color chooseColor = Color.black;
     private Camera _mainCamera;
     private Tilemap _tilemap;
 
@@ -48,63 +51,117 @@ public class MapController : MonoBehaviour
         }
     }
 
+    public ActionStage actionStage = ActionStage.ChoosePosTo;
+    public GameMode gameMode = GameMode.MoveCopy;
+    public int gameModeID = 0;
+    public Vector3Int posFrom, posTo;
+    public IMakeActionInstruction instruction;
     private void Update()
     {
         Player currentPlayer = players[currentPlayerIndex];
-        DrawMove(currentPlayer, turnColorNoCopy, currentPlayer.playerMoveNoCopy);
-        DrawMove(currentPlayer, turnColor, currentPlayer.playerMoveCopy);
-        DrawMove(currentPlayer, attackColorNoCopy, currentPlayer.PlayerAttackNoCopy);
+        if (actionStage == ActionStage.ChoosePosTo)
+        {
+            if(gameMode == GameMode.MoveCopy)DrawMove(currentPlayer, turnColor, currentPlayer.playerMoveCopy, currentPlayer.playerMoveCopy);
+            if(gameMode == GameMode.MoveNoCopy)DrawMove(currentPlayer, turnColorNoCopy, currentPlayer.playerMoveNoCopy, currentPlayer.playerMoveNoCopy);
+            if(gameMode == GameMode.AttackNoCopy)DrawMove(currentPlayer, attackColorNoCopy, currentPlayer.PlayerAttackNoCopy, currentPlayer.PlayerAttackNoCopy);
+        }
         if (Input.GetMouseButtonUp(0))
         {
             Vector3 currentPos = _mainCamera.ScreenToWorldPoint(Input.mousePosition);
             Vector3Int cellPos = _tilemap.WorldToCell(currentPos);
-            if (map.cellMap.ContainsKey(cellPos) && _tilemap.GetColor(cellPos) == turnColor)
+            if (map.cellMap.ContainsKey(cellPos))
             {
-                ClearCells();
-                MakeCopyMove(cellPos, currentPlayer);
+                if (actionStage == ActionStage.ChoosePosTo && _tilemap.GetColor(cellPos) != Color.white)
+                {
+                    List<Vector3Int> availableCells = new List<Vector3Int>();
+                    posTo = cellPos;
+                    if (_tilemap.GetColor(cellPos) == turnColor)
+                    {
+                        availableCells = GetPos(currentPlayer, cellPos, currentPlayer.playerMoveCopy);
+                        instruction = currentPlayer.playerMoveCopy;
+                    }
+
+                    if (_tilemap.GetColor(cellPos) == turnColorNoCopy)
+                    {
+                        availableCells = GetPos(currentPlayer, cellPos, currentPlayer.playerMoveNoCopy);
+                        instruction = currentPlayer.playerMoveNoCopy;
+                    }
+
+                    if (_tilemap.GetColor(cellPos) == attackColorNoCopy)
+                    {
+                        availableCells = GetPos(currentPlayer, cellPos, currentPlayer.PlayerAttackNoCopy);
+                        instruction = currentPlayer.PlayerAttackNoCopy;
+                    }
+
+                    ClearCells();
+                    if (availableCells.Count == 1){
+                        posFrom = availableCells[0];
+                        actionStage = ActionStage.MakeAction;
+                    }
+                    else
+                    {
+                        foreach (var cell in availableCells)
+                        {
+                            Debug.Log(cell);
+                            chooseTilemap.SetTile(cell,chooseTile);
+                            chooseTilemap.SetTileFlags(cell,TileFlags.None);
+                            chooseTilemap.SetColor(cell,chooseColor);
+                        }
+                        actionStage = ActionStage.ChoosePosFrom;
+                    }
+                }else
+                if (actionStage == ActionStage.ChoosePosFrom)
+                {
+                    Debug.Log("From");
+                    if (chooseTilemap.GetColor(cellPos) == chooseColor)
+                    {
+                        posFrom = cellPos;
+                    }
+                    actionStage = ActionStage.MakeAction;
+                }
+                if (actionStage == ActionStage.MakeAction)
+                {
+                    MakeInstruction(posFrom,posTo,currentPlayer,instruction);
+                    ClearCells();
+                    actionStage = ActionStage.ChoosePosTo;
+                    gameModeID = 0;
+                    gameMode = GameMode.MoveCopy;
+                }
             }
-            if (map.cellMap.ContainsKey(cellPos) && _tilemap.GetColor(cellPos) == turnColorNoCopy)
-            {
-                ClearCells();
-                List<Vector3Int> availableCells = GetPos(currentPlayer, cellPos, currentPlayer.playerMoveNoCopy);
-                MakeNoCopyMove(availableCells[0],cellPos, currentPlayer);
-            }
-            if (map.cellMap.ContainsKey(cellPos) && _tilemap.GetColor(cellPos) == attackColorNoCopy)
-            {
-                ClearCells();
-                List<Vector3Int> availableCells = GetPos(currentPlayer, cellPos, currentPlayer.PlayerAttackNoCopy);
-                MakeNoCopyAttack(availableCells[0],cellPos, currentPlayer);
-            }
+
+           
         }
     }
 
+    public void ChangeGameMode()
+    {
+        ++gameModeID;
+        gameModeID %= 3;
+        switch (gameModeID)
+        {
+            case(0) : 
+                gameMode = GameMode.MoveCopy;
+                break; 
+            case(1) : 
+                gameMode = GameMode.MoveNoCopy; 
+                break; 
+            case(2) : 
+                gameMode = GameMode.AttackNoCopy; 
+                break; 
+        }
+        ClearCells();
+    }
+    
     public void ClearCells()
     {
         foreach (var cell in map.cellMap)
         {
             _tilemap.SetColor(cell.Key,Color.white);
         }
-    }
-
-    public bool DrawMove(Player player,Color color,PlayerMove action)
-    {
-        bool setTile = false;
-        foreach (var cell in player.cellPositions)
-        {
-            foreach (var add in action.availableTranslations)
-            {
-                Vector3Int checkPos = cell + add;
-                if (map.cellMap.ContainsKey(checkPos) && map.cellMap[checkPos].tilePlayer == null)
-                {
-                    _tilemap.SetColor(checkPos,color);
-                    setTile = true;
-                }
-            }
-        }
-        return setTile;
+        chooseTilemap.ClearAllTiles();
     }
     
-    public bool DrawMove(Player player,Color color,PlayerAttack action)
+    public bool DrawMove(Player player,Color color,IPlayerAction action,IDrawActionInstruction instruction)
     {
         bool setTile = false;
         foreach (var cell in player.cellPositions)
@@ -112,9 +169,7 @@ public class MapController : MonoBehaviour
             foreach (var add in action.availableTranslations)
             {
                 Vector3Int checkPos = cell + add;
-                if (map.cellMap.ContainsKey(checkPos) &&
-                    map.cellMap[checkPos].tilePlayer != null &&
-                    map.cellMap[checkPos].tilePlayer != player)
+                if (instruction.Instruction(map,checkPos,player))
                 {
                     setTile = true;
                     _tilemap.SetTileFlags(checkPos,TileFlags.None);
@@ -124,13 +179,13 @@ public class MapController : MonoBehaviour
         }
         return setTile;
     }
-    
-    public List<Vector3Int> GetPos(Player player,Vector3Int posTo,PlayerAttack action)
+
+    public List<Vector3Int> GetPos(Player player,Vector3Int posTo,IPlayerAction action)
     {
         List<Vector3Int> playerCells = new List<Vector3Int>();
         foreach (var add in action.availableTranslations)
         {
-            Vector3Int checkPos = posTo + add;
+            Vector3Int checkPos = posTo + add * -1;
             if (map.cellMap.ContainsKey(checkPos) &&
                 map.cellMap[checkPos].tilePlayer == player)
             {
@@ -141,44 +196,25 @@ public class MapController : MonoBehaviour
         return playerCells;
     }
     
-    public List<Vector3Int> GetPos(Player player,Vector3Int posTo,PlayerMove action)
+    public void MakeInstruction(Vector3Int posFrom, Vector3Int posTo, Player player, IMakeActionInstruction instruction)
     {
-        List<Vector3Int> playerCells = new List<Vector3Int>();
-        foreach (var add in action.availableTranslations)
-        {
-            Vector3Int checkPos = posTo + add;
-            if (map.cellMap.ContainsKey(checkPos) &&
-                map.cellMap[checkPos].tilePlayer == player)
-            {
-                playerCells.Add(checkPos);
-            }
-        }
+        instruction.Instruction(_tilemap,defaultTile,map,posFrom,posTo,player);
+        currentPlayerIndex++;
+        currentPlayerIndex %= players.Length;
+    }
+    
+}
 
-        return playerCells;
-    }
+public enum ActionStage
+{
+    ChoosePosTo,
+    ChoosePosFrom,
+    MakeAction,
+}
 
-    public void MakeCopyMove(Vector3Int pos, Player player)
-    {
-        map.PlayerUse(map.cellMap[pos],player,_tilemap);
-        currentPlayerIndex++;
-        currentPlayerIndex %= players.Length;
-    }
-    
-    public void MakeNoCopyMove(Vector3Int posFrom,Vector3Int posTo, Player player)
-    {
-        map.PlayerUse(map.cellMap[posTo],player,_tilemap);
-        map.PlayerUnuse(map.cellMap[posFrom],map.cellMap[posFrom].tilePlayer,_tilemap,defaulTile);
-        currentPlayerIndex++;
-        currentPlayerIndex %= players.Length;
-    }
-    
-    public void MakeNoCopyAttack(Vector3Int posFrom,Vector3Int posTo, Player player)
-    {
-        map.PlayerUnuse(map.cellMap[posTo],map.cellMap[posTo].tilePlayer,_tilemap,defaulTile);
-        map.PlayerUse(map.cellMap[posTo],player,_tilemap);
-        map.PlayerUnuse(map.cellMap[posFrom],player,_tilemap,defaulTile);
-        currentPlayerIndex++;
-        currentPlayerIndex %= players.Length;
-    }
-    
+public enum GameMode
+{
+    MoveCopy,
+    MoveNoCopy,
+    AttackNoCopy,
 }
