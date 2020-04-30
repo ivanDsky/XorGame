@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using TMPro;
 using System.Runtime.CompilerServices;
 using UnityEditor;
 using UnityEngine;
@@ -20,6 +21,7 @@ public class MapController : MonoBehaviour
     public Color turnColorNoCopy = new Color(0.19f,0.5f,1);
     public Color attackColorNoCopy = new Color(1f, 0.15f, 0.09f);
     public Color chooseColor = Color.black;
+    public TextMeshProUGUI p1, p2;
     private Camera _mainCamera;
     private Tilemap _tilemap;
 
@@ -53,6 +55,12 @@ public class MapController : MonoBehaviour
         }
     }
 
+    public void TextUpdate()
+    {
+        p1.text = "Cells : " + players[0].cellPositions.Count + "\nMoves : " + players[0].moves;
+        p2.text = "Cells : " + players[1].cellPositions.Count + "\nMoves : " + players[1].moves;
+    }
+
     public ActionStage actionStage = ActionStage.ChoosePosTo;
     public GameMode gameMode = GameMode.MoveCopy;
     public int gameModeID = 0;
@@ -61,6 +69,13 @@ public class MapController : MonoBehaviour
     private void Update()
     {
         Player currentPlayer = players[currentPlayerIndex];
+        TextUpdate();
+        if (currentPlayer.moves == 0)
+        {
+            currentPlayerIndex++;
+            currentPlayerIndex %= players.Length;
+            return;
+        }
         if (actionStage == ActionStage.ChoosePosTo)
         {
             if(gameMode == GameMode.MoveCopy)DrawMove(currentPlayer, turnColor, currentPlayer.playerMoveCopy, currentPlayer.playerMoveCopy);
@@ -104,6 +119,7 @@ public class MapController : MonoBehaviour
                     {
                         foreach (var cell in availableCells)
                         {
+                            Debug.Log(cell);
                             chooseTilemap.SetTile(cell,chooseTile);
                             chooseTilemap.SetTileFlags(cell,TileFlags.None);
                             chooseTilemap.SetColor(cell,chooseColor);
@@ -113,6 +129,7 @@ public class MapController : MonoBehaviour
                 }else
                 if (actionStage == ActionStage.ChoosePosFrom)
                 {
+                    Debug.Log("From");
                     if (chooseTilemap.GetColor(cellPos) == chooseColor)
                     {
                         posFrom = cellPos;
@@ -127,6 +144,7 @@ public class MapController : MonoBehaviour
                         isBonus = true;
                         instruction = currentPlayer.playerMoveCopy;
                     }
+                    currentPlayer.moves--;
                     MakeInstruction(posFrom,posTo,currentPlayer,instruction);
                     if(isBonus)SpawnBonusTile();
                     ClearCells();

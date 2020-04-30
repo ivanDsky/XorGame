@@ -14,5 +14,6 @@ public class Player
     public PlayerMove playerMoveCopy;
     public PlayerMove playerMoveNoCopy;
     public PlayerAttack PlayerAttackNoCopy;
+    public int moves;
     public List<Vector3Int> cellPositions = new List<Vector3Int>();
 }
