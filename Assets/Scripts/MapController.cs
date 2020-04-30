@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -10,6 +11,7 @@ public class MapController : MonoBehaviour
     public Tilemap chooseTilemap;
     public TileBase defaultTile;
     public TileBase chooseTile;
+    public TileBase bonusTile;
     public MapClass map;
     public Vector2Int mapSize;
     public Player[] players;
@@ -102,7 +104,6 @@ public class MapController : MonoBehaviour
                     {
                         foreach (var cell in availableCells)
                         {
-                            Debug.Log(cell);
                             chooseTilemap.SetTile(cell,chooseTile);
                             chooseTilemap.SetTileFlags(cell,TileFlags.None);
                             chooseTilemap.SetColor(cell,chooseColor);
@@ -112,7 +113,6 @@ public class MapController : MonoBehaviour
                 }else
                 if (actionStage == ActionStage.ChoosePosFrom)
                 {
-                    Debug.Log("From");
                     if (chooseTilemap.GetColor(cellPos) == chooseColor)
                     {
                         posFrom = cellPos;
@@ -121,7 +121,14 @@ public class MapController : MonoBehaviour
                 }
                 if (actionStage == ActionStage.MakeAction)
                 {
+                    bool isBonus = false;
+                    if (map.cellMap[posTo].tile == bonusTile)
+                    {
+                        isBonus = true;
+                        instruction = currentPlayer.playerMoveCopy;
+                    }
                     MakeInstruction(posFrom,posTo,currentPlayer,instruction);
+                    if(isBonus)SpawnBonusTile();
                     ClearCells();
                     actionStage = ActionStage.ChoosePosTo;
                     gameModeID = 0;
@@ -133,6 +140,31 @@ public class MapController : MonoBehaviour
         }
     }
 
+
+    public void SpawnBonusTile()
+    {
+        int cellCount = map.cellMap.Count - 1;
+        foreach (var player in players)
+        {
+            cellCount -= player.cellPositions.Count;
+        }
+
+        int cellID = Random.Range(0, cellCount);
+        foreach (var cellPair in map.cellMap)
+        {
+            if (cellPair.Value.tilePlayer != null) continue;
+            if (cellID == 0)
+            {
+                _tilemap.SetTile(cellPair.Key,bonusTile);
+                cellPair.Value.tile = bonusTile;
+                Debug.Log(cellPair.Value.pos);
+                break;
+            }
+            --cellID;
+        }
+
+    }
+    
     public void ChangeGameMode()
     {
         ++gameModeID;
