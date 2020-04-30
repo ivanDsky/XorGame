@@ -9,17 +9,17 @@ using UnityEngine.Tilemaps;
 [Serializable]
 public class MapClass
 {
-    public Dictionary<Vector2Int,FieldCell> cellMap;
+    public Dictionary<Vector3Int,FieldCell> cellMap;
     public Vector2Int size;
 
     public MapClass(Vector2Int size)
     {
         
         this.size = size;
-        cellMap = new Dictionary<Vector2Int, FieldCell>();
+        cellMap = new Dictionary<Vector3Int, FieldCell>();
     }
 
-    public bool IsAvaiable(Vector2Int pos,Tilemap tilemap)
+    public bool IsAvaiable(Vector3Int pos,Tilemap tilemap)
     {
         List<FieldCell> cnt = new List<FieldCell>();
         for (int addX = -1; addX <= 1; ++addX)
@@ -27,7 +27,7 @@ public class MapClass
             for (int addY = -1; addY <= 1; ++addY)
             {
                 if (Math.Abs(addX + addY) != 1) continue;
-                Vector2Int nPos = new Vector2Int(pos.x + addX,pos.y + addY);
+                Vector3Int nPos = new Vector3Int(pos.x + addX,pos.y + addY,0);
                 if (!cellMap.ContainsKey(nPos)) continue;
                 FieldCell cell = cellMap[nPos];
                 Player neighbour = cell.tilePlayer;
@@ -47,6 +47,16 @@ public class MapClass
     {
         cellMap[cell.pos].tile = player.playerTile;
         cellMap[cell.pos].tilePlayer = player;
-        tilemap.SetTile((Vector3Int)cell.pos,player.playerTile);
+        player.cellPositions.Add(cell.pos);
+        tilemap.SetTile(cell.pos,player.playerTile);
+    }
+    
+    public void PlayerUnuse(FieldCell cell,Player player,Tilemap tilemap,TileBase defaulTile)
+    {
+        cellMap[cell.pos].tile = defaulTile;
+        cellMap[cell.pos].tilePlayer = null;
+        player.cellPositions.Remove(cell.pos);
+        tilemap.SetTile(cell.pos,defaulTile);
+        tilemap.SetTileFlags(cell.pos,TileFlags.None);
     }
 }
